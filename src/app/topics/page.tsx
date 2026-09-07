@@ -68,7 +68,8 @@ export default async function TopicsPage() {
                         {topic.subject.name}
                       </Link>
                       {" · "}
-                      Studied {formatDisplayDate(topic.dateStudied)} · Exam{" "}
+                      Studied {formatDisplayDate(topic.dateStudied)} · Next
+                      revision {formatDisplayDate(topic.nextRevisionDate)} · Exam{" "}
                       {formatDisplayDate(exam)}
                     </CardDescription>
                   </div>

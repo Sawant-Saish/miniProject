@@ -115,7 +115,91 @@ Optional: `npx prisma studio` to inspect SQLite rows.
 
 ## Phase 2 — Baseline spaced-repetition scheduler (exam-date aware)
 
-**Status:** Not started — waiting for confirmation  
+**Status:** Complete  
+**Date:** 2026-09-07
+
+### Goals
+
+- Implement a simplified SM-2-style interval calculator as pure, testable functions
+- Add exam-date ceiling: intervals compress as the exam nears; no revision past exam date
+- Auto-archive topics once their effective exam date has passed
+- On topic create, auto-generate the first `nextRevisionDate`
+- Dashboard: "Due today," "Due this week," "Upcoming," grouped by subject
+
+### What was built
+
+#### Scheduler (`src/lib/scheduler.ts`)
+
+Pure functions with no database dependency:
+
+| Function | Purpose |
+| --- | --- | --- |
+| `getBaseIntervalDays` | SM-2-inspired ladder: 1 → 3 → 7 → 14 → 30 → 60 days; poor scores reset to 1 day |
+| `applyExamCompression` | Shrinks intervals within 14 days of exam; caps at days remaining |
+| `calculateNextRevision` | Combines interval + exam ceiling; returns `null` when exam passed |
+| `scheduleInitialRevision` | First review for a newly studied topic |
+| `scheduleAfterAttempt` | Ready for Phase 3 — recalculates after quiz/explanation score |
+| `classifyRevisionBucket` | Buckets a date into due-today / this-week / upcoming |
+
+#### Schedule service (`src/lib/schedule-service.ts`)
+
+- `buildInitialTopicSchedule` — used when creating topics
+- `archiveExpiredTopics` — sets `isActive: false` when exam date has passed
+- `backfillMissingSchedules` — assigns dates to Phase 1 topics that had `null`
+- `syncScheduleState` — runs archive + backfill before dashboard reads
+- `applyAttemptSchedule` — entry point for Phase 3 quiz scoring
+
+#### Dashboard (`src/lib/dashboard.ts` + `src/components/revision-dashboard.tsx`)
+
+Home page (`/`) now shows:
+
+- Summary counts for due today / this week / upcoming
+- Three columns grouped by **subject**, with overdue badge on late items
+- Empty state when no active scheduled topics
+
+#### Integration
+
+- `createTopic` sets `nextRevisionDate` and `isActive` via scheduler
+- `updateTopic` reschedules when study/exam dates change; archives if exam expired
+- Subject detail, topics list, and topic detail show next revision date
+
+### How to run / test Phase 2
+
+```bash
+npm install
+npx prisma migrate dev   # no new migration — schema unchanged
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+**Manual test checklist**
+
+1. Create a subject with an exam date ~2 weeks away  
+2. Add a topic studied today — confirm **next revision** is ~1 day out on subject page  
+3. Add a topic studied 5 days ago — confirm it appears under **Due today** (overdue) on home  
+4. Add a topic with exam override in the past — confirm it becomes **Inactive** after save/dashboard load  
+5. Edit a subject exam date to tomorrow — confirm intervals compress on affected topics  
+6. Check dashboard groups topics under the correct subject headings  
+
+**Scheduler sanity check (Node REPL / tsx)**
+
+```bash
+npx tsx -e "
+import { scheduleInitialRevision, applyExamCompression } from './src/lib/scheduler.ts';
+const exam = new Date('2026-09-20T12:00:00');
+const studied = new Date('2026-09-07T12:00:00');
+console.log(scheduleInitialRevision(studied, exam));
+console.log('compressed 30d @ 5 days out:', applyExamCompression(30, exam, new Date('2026-09-15T12:00:00')));
+"
+```
+
+### Explicitly NOT in Phase 2
+
+- Quiz taking or scoring  
+- AI question generation / Feynman mode  
+- Bayesian mastery model (Phase 6)  
+- Mastery trend charts (Phase 7)  
 
 ---
 

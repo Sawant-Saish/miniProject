@@ -31,7 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {children}
         </main>
         <footer className="border-t border-border py-4 text-center text-xs text-muted-foreground">
-          Adaptive Revision Planner — Phase 1 (data model & CRUD)
+          Adaptive Revision Planner — Phase 2 (scheduling & dashboard)
         </footer>
       </body>
     </html>

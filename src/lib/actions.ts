@@ -2,6 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import {
+  buildInitialTopicSchedule,
+  resolveTopicScheduleState,
+} from "@/lib/schedule-service";
+import { scheduleInitialRevision } from "@/lib/scheduler";
 
 /** Parse an HTML date input (YYYY-MM-DD) into a Date at local noon to avoid TZ edge cases. */
 function parseDateInput(value: string | null | undefined): Date | null {
@@ -111,6 +116,12 @@ export async function createTopic(formData: FormData) {
       return { ok: false as const, error: "Subject not found." };
     }
 
+    const schedule = buildInitialTopicSchedule(
+      dateStudied,
+      examDateOverride,
+      subject.examDate
+    );
+
     await prisma.topic.create({
       data: {
         name,
@@ -118,9 +129,9 @@ export async function createTopic(formData: FormData) {
         dateStudied,
         examDateOverride,
         notes,
-        // Phase 1: no scheduling yet — nextRevisionDate stays null
         currentMasteryScore: 0,
-        isActive: true,
+        nextRevisionDate: schedule.nextRevisionDate,
+        isActive: schedule.isActive,
       },
     });
 
@@ -160,6 +171,36 @@ export async function updateTopic(formData: FormData) {
       return { ok: false as const, error: "Topic not found." };
     }
 
+    const subject = await prisma.subject.findUnique({
+      where: { id: existing.subjectId },
+    });
+
+    const { examDate, expired } = resolveTopicScheduleState({
+      ...existing,
+      dateStudied,
+      examDateOverride,
+      subject: { examDate: subject?.examDate ?? null },
+    });
+
+    let nextRevisionDate = existing.nextRevisionDate;
+    let nextIsActive = isActive;
+
+    if (expired) {
+      nextIsActive = false;
+      nextRevisionDate = null;
+    } else if (isActive) {
+      const datesChanged =
+        dateStudied.getTime() !== existing.dateStudied.getTime() ||
+        (examDateOverride?.getTime() ?? null) !==
+          (existing.examDateOverride?.getTime() ?? null);
+
+      if (!existing.nextRevisionDate || datesChanged) {
+        const schedule = scheduleInitialRevision(dateStudied, examDate);
+        nextRevisionDate = schedule.nextRevisionDate;
+        nextIsActive = schedule.isActive;
+      }
+    }
+
     await prisma.topic.update({
       where: { id },
       data: {
@@ -167,7 +208,8 @@ export async function updateTopic(formData: FormData) {
         dateStudied,
         examDateOverride,
         notes,
-        isActive,
+        isActive: nextIsActive,
+        nextRevisionDate,
       },
     });
 

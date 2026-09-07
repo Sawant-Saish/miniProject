@@ -119,8 +119,9 @@ export default async function SubjectDetailPage({ params }: PageProps) {
                         </Link>
                       </CardTitle>
                       <CardDescription>
-                        Studied {formatDisplayDate(topic.dateStudied)} · Exam{" "}
-                        {formatDisplayDate(exam)}
+                        Studied {formatDisplayDate(topic.dateStudied)} · Next
+                        revision {formatDisplayDate(topic.nextRevisionDate)} ·
+                        Exam {formatDisplayDate(exam)}
                         {topic.examDateOverride ? " (override)" : ""}
                       </CardDescription>
                     </div>

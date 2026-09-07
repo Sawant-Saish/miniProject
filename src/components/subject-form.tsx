@@ -73,8 +73,8 @@ export function SubjectForm({ mode, subject, redirectTo }: SubjectFormProps) {
           defaultValue={toDateInputValue(subject?.examDate)}
         />
         <p className="text-xs text-muted-foreground">
-          Topics inherit this date unless they set their own override. Used for
-          schedule compression from Phase 2.
+          Topics inherit this date unless they set their own override. The
+          scheduler compresses intervals as the exam approaches.
         </p>
       </div>
 
