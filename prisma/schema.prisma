@@ -1,0 +1,54 @@
+// Adaptive Revision Planner — Prisma schema (Phase 1)
+// SQLite for local demo; swap provider to "postgresql" later without changing models.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// A subject the student is studying (e.g. "Operating Systems").
+/// Exam date is set at subject level and inherited by topics unless overridden.
+model Subject {
+  id        String   @id @default(cuid())
+  name      String
+  examDate  DateTime? // optional ceiling for revision scheduling (used from Phase 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  topics Topic[]
+}
+
+/// A single topic within a subject (e.g. "Process Scheduling").
+model Topic {
+  id                  String    @id @default(cuid())
+  name                String
+  subjectId           String
+  dateStudied         DateTime // when the student first studied this topic
+  examDateOverride    DateTime? // optional per-topic exam date; falls back to Subject.examDate
+  notes               String? // free-text notes / content used later for AI grading & question gen
+  currentMasteryScore Float     @default(0) // 0–100 estimate; refined in later phases
+  nextRevisionDate    DateTime? // null until scheduling engine (Phase 2) assigns it
+  isActive            Boolean   @default(true) // set false after exam date passes (Phase 2+)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  subject  Subject           @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  attempts RevisionAttempt[]
+}
+
+/// One revision session attempt (quiz or explanation). Populated from Phase 3+.
+model RevisionAttempt {
+  id        String   @id @default(cuid())
+  topicId   String
+  date      DateTime @default(now())
+  type      String // "quiz" | "explanation" — stored as string for SQLite simplicity
+  score     Float // 0–100
+  feedback  String? // JSON string of structured feedback (gaps, comments, etc.)
+  createdAt DateTime @default(now())
+
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+}

@@ -1,69 +1,153 @@
-import Image from "next/image";
+import Link from "next/link";
+import { BookMarked, Layers, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { prisma } from "@/lib/db";
+import { formatDisplayDate } from "@/lib/dates";
+import { cn } from "@/lib/utils";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const [subjectCount, topicCount, subjects] = await Promise.all([
+    prisma.subject.count(),
+    prisma.topic.count(),
+    prisma.subject.findMany({
+      include: {
+        topics: {
+          orderBy: { dateStudied: "desc" },
+          take: 3,
+        },
+        _count: { select: { topics: true } },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 6,
+    }),
+  ]);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="space-y-8">
+      <section className="space-y-3">
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Adaptive Revision Planner
+        </h1>
+        <p className="max-w-2xl text-muted-foreground">
+          Track subjects and topics you have studied. Later phases add exam-aware
+          spaced repetition, quizzes, and AI-powered explain-it-back grading.
+        </p>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Link href="/subjects" className={cn(buttonVariants())}>
+            <Layers className="size-4" />
+            Manage subjects
+          </Link>
+          <Link
+            href="/topics"
+            className={cn(buttonVariants({ variant: "outline" }))}
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <BookMarked className="size-4" />
+            All topics
+          </Link>
+          <Link
+            href="/subjects/new"
+            className={cn(buttonVariants({ variant: "secondary" }))}
           >
-            Documentation
-          </a>
+            <Plus className="size-4" />
+            New subject
+          </Link>
         </div>
-      </main>
+      </section>
+
+      <section className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardDescription>Subjects</CardDescription>
+            <CardTitle className="text-3xl tabular-nums">{subjectCount}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardDescription>Topics</CardDescription>
+            <CardTitle className="text-3xl tabular-nums">{topicCount}</CardTitle>
+          </CardHeader>
+        </Card>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg font-medium">Recent subjects</h2>
+          <Link
+            href="/subjects"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            View all
+          </Link>
+        </div>
+
+        {subjects.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              No subjects yet.{" "}
+              <Link href="/subjects/new" className="underline underline-offset-2">
+                Create your first subject
+              </Link>{" "}
+              to get started.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {subjects.map((subject) => (
+              <Card key={subject.id}>
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle>
+                      <Link
+                        href={`/subjects/${subject.id}`}
+                        className="hover:underline"
+                      >
+                        {subject.name}
+                      </Link>
+                    </CardTitle>
+                    <Badge variant="secondary">
+                      {subject._count.topics} topic
+                      {subject._count.topics === 1 ? "" : "s"}
+                    </Badge>
+                  </div>
+                  <CardDescription>
+                    Exam: {formatDisplayDate(subject.examDate)}
+                  </CardDescription>
+                </CardHeader>
+                {subject.topics.length > 0 ? (
+                  <CardContent>
+                    <ul className="space-y-1 text-sm text-muted-foreground">
+                      {subject.topics.map((topic) => (
+                        <li key={topic.id}>
+                          <Link
+                            href={`/topics/${topic.id}`}
+                            className="hover:text-foreground hover:underline"
+                          >
+                            {topic.name}
+                          </Link>
+                          <span className="text-xs">
+                            {" "}
+                            · studied {formatDisplayDate(topic.dateStudied)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                ) : null}
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
