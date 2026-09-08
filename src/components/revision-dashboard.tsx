@@ -46,11 +46,11 @@ function TopicBucketList({ groups }: { groups: DashboardGroup[] }) {
             {group.topics.map((topic) => (
               <li
                 key={topic.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2"
+                className="flex flex-col gap-2 rounded-md border border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <Link
-                    href={`/topics/${topic.id}/quiz`}
+                    href={`/topics/${topic.id}`}
                     className="text-sm font-medium hover:underline"
                   >
                     {topic.name}

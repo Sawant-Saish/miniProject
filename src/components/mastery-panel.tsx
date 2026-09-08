@@ -6,6 +6,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { MasteryTrendChart } from "@/components/mastery-charts";
+import { buildMasteryChartData } from "@/lib/analytics";
 import {
   buildMasteryTimeline,
   estimateCurrentMastery,
@@ -26,6 +28,10 @@ export function MasteryPanel({ dateStudied, attempts }: MasteryPanelProps) {
   const estimated = estimateCurrentMastery(dateStudied, attempts);
   const band = masteryBand(estimated);
   const timeline = buildMasteryTimeline(dateStudied, attempts);
+  const chartData = buildMasteryChartData(
+    dateStudied,
+    attempts.map((a) => ({ date: a.date, score: a.score }))
+  );
 
   return (
     <Card>
@@ -45,9 +51,14 @@ export function MasteryPanel({ dateStudied, attempts }: MasteryPanelProps) {
         </div>
         <p className="text-sm text-muted-foreground">{band.description}</p>
 
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium">Mastery trend</h3>
+          <MasteryTrendChart data={chartData} />
+        </div>
+
         {timeline.length > 0 ? (
           <div className="space-y-3">
-            <h3 className="text-sm font-medium">Mastery trend</h3>
+            <h3 className="text-sm font-medium">Attempt history</h3>
             <ul className="space-y-2">
               {timeline.map((point, index) => (
                 <li

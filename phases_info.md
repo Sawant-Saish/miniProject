@@ -525,4 +525,57 @@ console.log('single update:', Math.round(bktUpdateFromScore(P_L0, 85) * 100));
 
 ## Phase 7 — Dashboard polish & analytics
 
-**Status:** Not started  
+**Status:** Complete  
+**Date:** 2026-09-08
+
+### Goals
+
+- Mastery trend chart per topic/subject (Recharts)
+- Overall retention health summary across active subjects
+- In-app reminder banner for due revisions
+- Final UI pass: empty states, loading states, mobile responsiveness
+
+### What was built
+
+#### Analytics (`src/lib/analytics.ts`)
+
+| Function | Purpose |
+| --- | --- |
+| `getRetentionHealth` | Average mastery, band counts, health label, at-risk topics |
+| `getSubjectMasterySummaries` | Per-subject average mastery for bar chart |
+| `getTopicMasterySummariesForSubject` | Per-topic mastery for subject detail chart |
+| `buildMasteryChartData` | Line chart series from attempt history |
+
+#### Charts (`src/components/mastery-charts.tsx` — client)
+
+- `MasteryTrendChart` — line chart on topic detail (Phase 6 table retained)
+- `SubjectMasteryChart` — bar chart on home dashboard
+- `TopicMasteryBarChart` — horizontal bars on subject detail page
+
+#### Dashboard polish
+
+- **DueReminderBanner** — shown when revisions are due today
+- **RetentionHealthCard** — average mastery, band breakdown, at-risk topic list
+- Home page layout: banner → analytics row → schedule buckets
+- `loading.tsx` skeletons for home and topic detail routes
+- Mobile: responsive header, stacked schedule rows, wrapped action buttons
+
+### How to run / test Phase 7
+
+```bash
+npm install
+npm run dev
+```
+
+1. Home page — confirm **Retention health** and **Mastery by subject** charts  
+2. With due topics — confirm amber **Revisions due** banner  
+3. Topic page — confirm Recharts **Mastery trend** line chart  
+4. Subject page — confirm horizontal **Topic mastery** bars  
+5. Throttle network in DevTools — confirm loading skeletons  
+6. Resize to mobile width — confirm layout remains usable  
+
+### Project complete
+
+All seven phases are implemented. See [phases_info.md](./phases_info.md) for the full build log.
+
+---

@@ -9,9 +9,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { TopicMasteryBarChart } from "@/components/mastery-charts";
 import { DeleteButton } from "@/components/delete-button";
 import { SubjectForm } from "@/components/subject-form";
 import { TopicForm } from "@/components/topic-form";
+import { getTopicMasterySummariesForSubject } from "@/lib/analytics";
 import { prisma } from "@/lib/db";
 import {
   formatDisplayDate,
@@ -35,6 +37,8 @@ export default async function SubjectDetailPage({ params }: PageProps) {
   });
 
   if (!subject) notFound();
+
+  const topicMastery = await getTopicMasterySummariesForSubject(id);
 
   return (
     <div className="space-y-8">
@@ -85,6 +89,25 @@ export default async function SubjectDetailPage({ params }: PageProps) {
           </CardContent>
         </Card>
       </section>
+
+      {topicMastery.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Topic mastery</CardTitle>
+            <CardDescription>
+              Estimated retention for active topics in this subject.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TopicMasteryBarChart
+              data={topicMastery.map((topic) => ({
+                name: topic.name,
+                mastery: topic.mastery,
+              }))}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Separator />
 

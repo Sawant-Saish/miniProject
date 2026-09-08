@@ -6,7 +6,7 @@ See **[phases_info.md](./phases_info.md)** for what each phase implements and ho
 
 ## Current phase
 
-**Phase 6** — BKT-inspired mastery model, decay-aware scheduling, mastery trend on topic page.
+**Phase 7 (complete)** — Recharts analytics, retention health summary, due banner, UI polish.
 
 ## Quick start
 
@@ -17,6 +17,8 @@ npm run dev
 ```
 
 App: [http://localhost:3000](http://localhost:3000)
+
+See **[phases_info.md](./phases_info.md)** for the full phased build log and test checklists.
 
 ## Scripts
 
@@ -31,10 +33,9 @@ App: [http://localhost:3000](http://localhost:3000)
 
 Copy `.env.example` to `.env` if needed.
 
-Phases 1–3:
-
 ```
 DATABASE_URL="file:./dev.db"
+OPENAI_API_KEY=sk-...   # Phases 4–5 AI features (never commit a real key)
 ```
 
-Phase 4+ also needs `OPENAI_API_KEY` in `.env` for AI generation (never commit a real key).
+Optional: `OPENAI_MODEL`, `AI_PROVIDER`.
