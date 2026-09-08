@@ -36,8 +36,24 @@ model Topic {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  subject  Subject           @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  attempts RevisionAttempt[]
+  subject   Subject           @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  attempts  RevisionAttempt[]
+  questions Question[]
+}
+
+/// Manually authored quiz question for a topic (Phase 3).
+model Question {
+  id            String   @id @default(cuid())
+  topicId       String
+  type          String // "mcq" | "short"
+  prompt        String
+  options       String? // JSON array of MCQ choices; null for short-answer
+  correctAnswer String
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
 }
 
 /// One revision session attempt (quiz or explanation). Populated from Phase 3+.

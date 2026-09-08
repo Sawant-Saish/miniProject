@@ -202,3 +202,12 @@ export function classifyRevisionBucket(
   if (daysAhead <= 7) return "dueThisWeek";
   return "upcoming";
 }
+
+/** True when a topic's next revision date is today or overdue. */
+export function isRevisionDue(
+  nextRevisionDate: Date | null | undefined,
+  today: Date = new Date()
+): boolean {
+  if (!nextRevisionDate) return false;
+  return differenceInCalendarDays(toDay(nextRevisionDate), toDay(today)) <= 0;
+}

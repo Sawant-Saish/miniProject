@@ -246,3 +246,285 @@ export async function deleteTopic(formData: FormData) {
     return { ok: false as const, error: formatError(error) };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Questions (Phase 3)
+// ---------------------------------------------------------------------------
+
+function parseMcqOptions(formData: FormData): string[] {
+  const options = [
+    String(formData.get("optionA") ?? "").trim(),
+    String(formData.get("optionB") ?? "").trim(),
+    String(formData.get("optionC") ?? "").trim(),
+    String(formData.get("optionD") ?? "").trim(),
+  ].filter(Boolean);
+
+  return options;
+}
+
+export async function createQuestion(formData: FormData) {
+  const topicId = String(formData.get("topicId") ?? "");
+  const type = String(formData.get("type") ?? "mcq");
+  const prompt = String(formData.get("prompt") ?? "").trim();
+
+  if (!topicId || !prompt) {
+    return { ok: false as const, error: "Topic and question prompt are required." };
+  }
+
+  if (type !== "mcq" && type !== "short") {
+    return { ok: false as const, error: "Question type must be mcq or short." };
+  }
+
+  try {
+    const topic = await prisma.topic.findUnique({ where: { id: topicId } });
+    if (!topic) {
+      return { ok: false as const, error: "Topic not found." };
+    }
+
+    let options: string | null = null;
+    let correctAnswer = "";
+
+    if (type === "mcq") {
+      const mcqOptions = parseMcqOptions(formData);
+      const correctIndex = Number(formData.get("correctOption") ?? -1);
+
+      if (mcqOptions.length < 2) {
+        return {
+          ok: false as const,
+          error: "MCQ questions need at least two options.",
+        };
+      }
+      if (correctIndex < 0 || correctIndex >= mcqOptions.length) {
+        return {
+          ok: false as const,
+          error: "Select which option is correct.",
+        };
+      }
+
+      options = JSON.stringify(mcqOptions);
+      correctAnswer = mcqOptions[correctIndex];
+    } else {
+      correctAnswer = String(formData.get("correctAnswer") ?? "").trim();
+      if (!correctAnswer) {
+        return {
+          ok: false as const,
+          error: "Short-answer questions need a correct answer.",
+        };
+      }
+    }
+
+    const count = await prisma.question.count({ where: { topicId } });
+
+    await prisma.question.create({
+      data: {
+        topicId,
+        type,
+        prompt,
+        options,
+        correctAnswer,
+        sortOrder: count,
+      },
+    });
+
+    revalidatePath(`/topics/${topicId}`);
+    revalidatePath(`/topics/${topicId}/quiz`);
+    return { ok: true as const };
+  } catch (error) {
+    return { ok: false as const, error: formatError(error) };
+  }
+}
+
+export async function deleteQuestion(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const topicId = String(formData.get("topicId") ?? "");
+
+  if (!id || !topicId) {
+    return { ok: false as const, error: "Question id and topic id are required." };
+  }
+
+  try {
+    await prisma.question.delete({ where: { id } });
+    revalidatePath(`/topics/${topicId}`);
+    revalidatePath(`/topics/${topicId}/quiz`);
+    return { ok: true as const };
+  } catch (error) {
+    return { ok: false as const, error: formatError(error) };
+  }
+}
+
+export async function submitQuiz(
+  topicId: string,
+  answers: Record<string, string>
+) {
+  if (!topicId) {
+    return { ok: false as const, error: "Topic id is required." };
+  }
+
+  try {
+    const topic = await prisma.topic.findUnique({
+      where: { id: topicId },
+      include: {
+        questions: { orderBy: { sortOrder: "asc" } },
+        subject: { select: { examDate: true } },
+      },
+    });
+
+    if (!topic) {
+      return { ok: false as const, error: "Topic not found." };
+    }
+    if (!topic.isActive) {
+      return { ok: false as const, error: "This topic is inactive." };
+    }
+    if (topic.questions.length === 0) {
+      return {
+        ok: false as const,
+        error: "Add at least one question before taking a quiz.",
+      };
+    }
+
+    const { scoreQuiz } = await import("@/lib/quiz-scoring");
+    const { applyAttemptSchedule } = await import("@/lib/schedule-service");
+
+    const result = scoreQuiz(topic.questions, answers);
+    const reviewDate = new Date();
+
+    await prisma.revisionAttempt.create({
+      data: {
+        topicId,
+        type: "quiz",
+        score: result.score,
+        date: reviewDate,
+        feedback: JSON.stringify({
+          correctCount: result.correctCount,
+          totalCount: result.totalCount,
+          results: result.results,
+        }),
+      },
+    });
+
+    await applyAttemptSchedule(topicId, result.score, reviewDate);
+
+    revalidatePath("/");
+    revalidatePath("/topics");
+    revalidatePath(`/topics/${topicId}`);
+    revalidatePath(`/topics/${topicId}/quiz`);
+
+    return {
+      ok: true as const,
+      score: result.score,
+      correctCount: result.correctCount,
+      totalCount: result.totalCount,
+      results: result.results,
+    };
+  } catch (error) {
+    return { ok: false as const, error: formatError(error) };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AI question generation (Phase 4)
+// ---------------------------------------------------------------------------
+
+export async function generateQuestionsWithAI(topicId: string) {
+  if (!topicId) {
+    return { ok: false as const, error: "Topic id is required." };
+  }
+
+  try {
+    const topic = await prisma.topic.findUnique({ where: { id: topicId } });
+    if (!topic) {
+      return { ok: false as const, error: "Topic not found." };
+    }
+
+    const notes = topic.notes?.trim();
+    if (!notes) {
+      return {
+        ok: false as const,
+        error: "Add notes or content to this topic before generating questions.",
+      };
+    }
+
+    const { getAIProvider } = await import("@/lib/ai");
+    const provider = getAIProvider();
+    const result = await provider.generateQuizQuestions({
+      topicName: topic.name,
+      notes,
+    });
+
+    return { ok: true as const, questions: result.questions };
+  } catch (error) {
+    return { ok: false as const, error: formatError(error) };
+  }
+}
+
+export async function saveGeneratedQuestions(
+  topicId: string,
+  drafts: Array<{
+    type: string;
+    prompt: string;
+    options: string[];
+    correctAnswer: string;
+  }>
+) {
+  if (!topicId) {
+    return { ok: false as const, error: "Topic id is required." };
+  }
+
+  if (!Array.isArray(drafts) || drafts.length === 0) {
+    return { ok: false as const, error: "No questions to save." };
+  }
+
+  try {
+    const topic = await prisma.topic.findUnique({ where: { id: topicId } });
+    if (!topic) {
+      return { ok: false as const, error: "Topic not found." };
+    }
+
+    const { normalizeQuestionDraft, validateQuestionDraft } = await import(
+      "@/lib/ai"
+    );
+
+    const normalized = [];
+    for (let i = 0; i < drafts.length; i++) {
+      const draft = {
+        type: drafts[i].type as "mcq" | "short",
+        prompt: String(drafts[i].prompt ?? ""),
+        options: Array.isArray(drafts[i].options)
+          ? drafts[i].options.map(String)
+          : [],
+        correctAnswer: String(drafts[i].correctAnswer ?? ""),
+      };
+
+      const validationError = validateQuestionDraft(draft, i);
+      if (validationError) {
+        return { ok: false as const, error: validationError };
+      }
+
+      normalized.push(normalizeQuestionDraft(draft));
+    }
+
+    const existingCount = await prisma.question.count({ where: { topicId } });
+
+    await prisma.$transaction(
+      normalized.map((question, index) =>
+        prisma.question.create({
+          data: {
+            topicId,
+            type: question.type,
+            prompt: question.prompt,
+            options: question.options,
+            correctAnswer: question.correctAnswer,
+            sortOrder: existingCount + index,
+          },
+        })
+      )
+    );
+
+    revalidatePath(`/topics/${topicId}`);
+    revalidatePath(`/topics/${topicId}/quiz`);
+
+    return { ok: true as const, savedCount: normalized.length };
+  } catch (error) {
+    return { ok: false as const, error: formatError(error) };
+  }
+}

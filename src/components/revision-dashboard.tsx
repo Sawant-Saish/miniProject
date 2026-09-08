@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { AlertCircle, Calendar, CalendarClock, CalendarDays } from "lucide-react";
+import { AlertCircle, Calendar, CalendarClock, CalendarDays, ClipboardCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -10,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import type { DashboardGroup } from "@/lib/dashboard";
 import { formatDisplayDate } from "@/lib/dates";
+import { cn } from "@/lib/utils";
 
 type RevisionDashboardProps = {
   dueToday: DashboardGroup[];
@@ -48,7 +50,7 @@ function TopicBucketList({ groups }: { groups: DashboardGroup[] }) {
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <Link
-                    href={`/topics/${topic.id}`}
+                    href={`/topics/${topic.id}/quiz`}
                     className="text-sm font-medium hover:underline"
                   >
                     {topic.name}
@@ -60,11 +62,23 @@ function TopicBucketList({ groups }: { groups: DashboardGroup[] }) {
                     </Badge>
                   ) : null}
                 </div>
-                <span className="text-xs text-muted-foreground">
-                  {formatDisplayDate(topic.nextRevisionDate)}
-                  <span className="mx-1">·</span>
-                  Mastery {Math.round(topic.mastery)}%
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {formatDisplayDate(topic.nextRevisionDate)}
+                    <span className="mx-1">·</span>
+                    Mastery {Math.round(topic.mastery)}%
+                  </span>
+                  <Link
+                    href={`/topics/${topic.id}/quiz`}
+                    className={cn(
+                      buttonVariants({ size: "sm", variant: "outline" }),
+                      "h-7 gap-1 px-2 text-xs"
+                    )}
+                  >
+                    <ClipboardCheck className="size-3" />
+                    Revise
+                  </Link>
+                </div>
               </li>
             ))}
           </ul>

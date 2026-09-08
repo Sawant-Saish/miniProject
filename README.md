@@ -6,7 +6,7 @@ See **[phases_info.md](./phases_info.md)** for what each phase implements and ho
 
 ## Current phase
 
-**Phase 2** — exam-aware SM-2 scheduler, auto-archive, revision dashboard.
+**Phase 4** — OpenAI question generation via pluggable AI provider; review before save.
 
 ## Quick start
 
@@ -29,10 +29,12 @@ App: [http://localhost:3000](http://localhost:3000)
 
 ## Environment
 
-Copy `.env.example` to `.env` if needed. Phases 1–2 only need:
+Copy `.env.example` to `.env` if needed.
+
+Phases 1–3:
 
 ```
 DATABASE_URL="file:./dev.db"
 ```
 
-`OPENAI_API_KEY` is required from Phase 4 onward (never commit a real key).
+Phase 4+ also needs `OPENAI_API_KEY` in `.env` for AI generation (never commit a real key).

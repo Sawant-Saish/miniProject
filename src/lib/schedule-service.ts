@@ -166,6 +166,7 @@ export async function applyAttemptSchedule(
     data: {
       nextRevisionDate: schedule.nextRevisionDate,
       isActive: schedule.isActive,
+      currentMasteryScore: score,
     },
   });
 
