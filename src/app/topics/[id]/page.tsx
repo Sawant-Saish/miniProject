@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { AiQuestionGenerator } from "@/components/ai-question-generator";
 import { DeleteButton } from "@/components/delete-button";
+import { MasteryPanel } from "@/components/mastery-panel";
 import { QuestionForm } from "@/components/question-form";
 import { QuestionList } from "@/components/question-list";
 import { TopicForm } from "@/components/topic-form";
@@ -20,6 +21,7 @@ import {
   formatDisplayDate,
   getEffectiveExamDate,
 } from "@/lib/dates";
+import { estimateCurrentMastery, masteryBand } from "@/lib/mastery";
 import { isRevisionDue } from "@/lib/scheduler";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +39,7 @@ export default async function TopicDetailPage({ params }: PageProps) {
     include: {
       subject: true,
       questions: { orderBy: { sortOrder: "asc" } },
-      attempts: { orderBy: { date: "desc" }, take: 5 },
+      attempts: { orderBy: { date: "asc" } },
     },
   });
 
@@ -50,6 +52,12 @@ export default async function TopicDetailPage({ params }: PageProps) {
   const due = topic.isActive && isRevisionDue(topic.nextRevisionDate);
   const canQuiz = topic.isActive && topic.questions.length > 0;
   const canExplain = topic.isActive && Boolean(topic.notes?.trim());
+  const estimatedMastery = estimateCurrentMastery(
+    topic.dateStudied,
+    topic.attempts
+  );
+  const masteryLabel = masteryBand(estimatedMastery);
+  const recentAttempts = [...topic.attempts].reverse().slice(0, 5);
 
   return (
     <div className="space-y-8">
@@ -71,7 +79,7 @@ export default async function TopicDetailPage({ params }: PageProps) {
               {topic.isActive ? "Active" : "Inactive"}
             </Badge>
             <Badge variant="outline">
-              Mastery {Math.round(topic.currentMasteryScore)}%
+              Mastery {Math.round(estimatedMastery)}% · {masteryLabel.label}
             </Badge>
             <Badge variant="outline">
               Next revision: {formatDisplayDate(topic.nextRevisionDate)}
@@ -128,6 +136,15 @@ export default async function TopicDetailPage({ params }: PageProps) {
         </Card>
       ) : null}
 
+      <MasteryPanel
+        dateStudied={topic.dateStudied}
+        attempts={topic.attempts.map((attempt) => ({
+          date: attempt.date,
+          score: attempt.score,
+          type: attempt.type,
+        }))}
+      />
+
       <Card>
         <CardHeader>
           <CardTitle>Question bank</CardTitle>
@@ -148,17 +165,17 @@ export default async function TopicDetailPage({ params }: PageProps) {
         </CardContent>
       </Card>
 
-      {topic.attempts.length > 0 ? (
+      {recentAttempts.length > 0 ? (
         <Card>
           <CardHeader>
             <CardTitle>Recent attempts</CardTitle>
             <CardDescription>
-              Quiz scores feed into the spaced-repetition schedule.
+              Quiz and explanation scores update the BKT mastery model and schedule.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              {topic.attempts.map((attempt) => {
+              {recentAttempts.map((attempt) => {
                 let feedbackPreview: string | null = null;
                 if (attempt.type === "explanation" && attempt.feedback) {
                   try {

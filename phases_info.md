@@ -449,7 +449,77 @@ npm run dev
 
 ## Phase 6 — Adaptive mastery engine upgrade
 
-**Status:** Not started  
+**Status:** Complete  
+**Date:** 2026-09-08
+
+### Goals
+
+- Replace flat SM-2 score updates with a lightweight BKT-inspired mastery model
+- Factor in time decay between reviews
+- Recalculate next revision from mastery estimate (still exam-date capped)
+- Show mastery estimate and trend on the topic detail page
+
+### What was built
+
+#### Mastery model (`src/lib/mastery.ts`)
+
+| Concept | Implementation |
+| --- | --- |
+| Prior | `P_L0 = 0.2` (~20% for new topics) |
+| Observation | Soft BKT update from 0–100 quiz/explanation score |
+| Forgetting | Exponential decay between reviews (`DECAY_RATE_PER_DAY`) |
+| Display | `currentMasteryScore` stores 0–100 estimate |
+
+Key functions: `computeMasteryFromAttempts`, `estimateCurrentMastery`, `buildMasteryTimeline`, `masteryBand`.
+
+#### Scheduling (`src/lib/scheduler.ts`)
+
+- `intervalDaysFromMastery` — maps mastery % to interval ladder (1→60 days)
+- `scheduleFromMastery` — replaces `scheduleAfterAttempt` for post-attempt scheduling
+- Poor latest attempt (&lt;60) still forces a 1-day reset
+- Exam compression unchanged
+
+#### Integration (`src/lib/schedule-service.ts`)
+
+- `applyAttemptSchedule` replays attempt history → BKT mastery → `scheduleFromMastery`
+- `refreshMasteryEstimates` runs on dashboard sync (applies time decay to stored scores)
+- New topics start at ~20% mastery
+
+#### UI (`MasteryPanel` on topic page)
+
+- Current mastery % with band label (Needs work → Mastered)
+- **Mastery trend** table: each attempt → mastery after update
+- Header badge shows estimated mastery (includes decay)
+
+### How to run / test Phase 6
+
+```bash
+npm install
+npm run dev
+```
+
+1. Create a topic — confirm mastery ~20% on topic page  
+2. Take a quiz with a high score — mastery should rise; next revision extends  
+3. Take a quiz with score &lt;60 — mastery drops; next revision ~1 day  
+4. Check **Mastery trend** shows running estimates after each attempt  
+5. Reload dashboard — decay may lower mastery for topics idle several days  
+
+**Sanity check**
+
+```bash
+npx tsx -e "
+import { computeMasteryFromAttempts, bktUpdateFromScore, P_L0 } from './src/lib/mastery.ts';
+const studied = new Date('2026-09-01');
+const attempts = [{ date: new Date('2026-09-05'), score: 85 }];
+console.log('after good quiz:', computeMasteryFromAttempts(studied, attempts));
+console.log('single update:', Math.round(bktUpdateFromScore(P_L0, 85) * 100));
+"
+```
+
+### Explicitly NOT in Phase 6
+
+- Recharts mastery charts (Phase 7)  
+- Email/push reminders (Phase 7)  
 
 ---
 

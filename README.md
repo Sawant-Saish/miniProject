@@ -6,7 +6,7 @@ See **[phases_info.md](./phases_info.md)** for what each phase implements and ho
 
 ## Current phase
 
-**Phase 5** — Feynman explain-it-back mode with AI grading and scheduler integration.
+**Phase 6** — BKT-inspired mastery model, decay-aware scheduling, mastery trend on topic page.
 
 ## Quick start
 

@@ -129,7 +129,7 @@ export async function createTopic(formData: FormData) {
         dateStudied,
         examDateOverride,
         notes,
-        currentMasteryScore: 0,
+        currentMasteryScore: schedule.currentMasteryScore,
         nextRevisionDate: schedule.nextRevisionDate,
         isActive: schedule.isActive,
       },

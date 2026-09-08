@@ -5,9 +5,14 @@
 import { prisma } from "@/lib/db";
 import { getEffectiveExamDate } from "@/lib/dates";
 import {
+  computeMasteryFromAttempts,
+  estimateCurrentMastery,
+  initialMasteryScore,
+} from "@/lib/mastery";
+import {
   isExamExpired,
+  scheduleFromMastery,
   scheduleInitialRevision,
-  scheduleAfterAttempt,
 } from "@/lib/scheduler";
 
 type TopicWithSubject = {
@@ -87,6 +92,7 @@ export async function backfillMissingSchedules(today = new Date()) {
       data: {
         nextRevisionDate: schedule.nextRevisionDate,
         isActive: schedule.isActive,
+        currentMasteryScore: initialMasteryScore(),
       },
     });
   }
@@ -94,11 +100,48 @@ export async function backfillMissingSchedules(today = new Date()) {
   return topics.length;
 }
 
-/** Run archive + backfill before dashboard reads. */
+/** Run archive + backfill + mastery refresh before dashboard reads. */
 export async function syncScheduleState(today = new Date()) {
   const archived = await archiveExpiredTopics(today);
   const backfilled = await backfillMissingSchedules(today);
-  return { archived, backfilled };
+  const masteryUpdated = await refreshMasteryEstimates(today);
+  return { archived, backfilled, masteryUpdated };
+}
+
+/** Recompute stored mastery with time decay for all active topics. */
+export async function refreshMasteryEstimates(today = new Date()) {
+  const topics = await prisma.topic.findMany({
+    where: { isActive: true },
+    select: {
+      id: true,
+      dateStudied: true,
+      currentMasteryScore: true,
+      attempts: {
+        orderBy: { date: "asc" },
+        select: { date: true, score: true, type: true },
+      },
+    },
+  });
+
+  let updated = 0;
+
+  for (const topic of topics) {
+    const estimated = estimateCurrentMastery(
+      topic.dateStudied,
+      topic.attempts,
+      today
+    );
+
+    if (Math.round(estimated) !== Math.round(topic.currentMasteryScore)) {
+      await prisma.topic.update({
+        where: { id: topic.id },
+        data: { currentMasteryScore: estimated },
+      });
+      updated++;
+    }
+  }
+
+  return updated;
 }
 
 /** Compute schedule fields when creating a topic. */
@@ -111,19 +154,23 @@ export function buildInitialTopicSchedule(
   const examDate = getEffectiveExamDate(examDateOverride, subjectExamDate);
 
   if (isExamExpired(examDateOverride, subjectExamDate, today)) {
-    return { nextRevisionDate: null, isActive: false };
+    return {
+      nextRevisionDate: null,
+      isActive: false,
+      currentMasteryScore: initialMasteryScore(),
+    };
   }
 
   const schedule = scheduleInitialRevision(dateStudied, examDate, today);
   return {
     nextRevisionDate: schedule.nextRevisionDate,
     isActive: schedule.isActive,
+    currentMasteryScore: initialMasteryScore(),
   };
 }
 
 /**
- * Recompute next revision after performance data (used from Phase 3 onward).
- * Exported here so quiz actions have a single entry point.
+ * Recompute mastery + next revision after a quiz/explanation attempt.
  */
 export async function applyAttemptSchedule(
   topicId: string,
@@ -134,7 +181,10 @@ export async function applyAttemptSchedule(
     where: { id: topicId },
     include: {
       subject: { select: { examDate: true } },
-      attempts: { select: { id: true } },
+      attempts: {
+        orderBy: { date: "asc" },
+        select: { date: true, score: true, type: true },
+      },
     },
   });
 
@@ -153,11 +203,22 @@ export async function applyAttemptSchedule(
     return null;
   }
 
-  const schedule = scheduleAfterAttempt(
+  const masteryScore = computeMasteryFromAttempts(
+    topic.dateStudied,
+    topic.attempts
+  );
+
+  const schedule = scheduleFromMastery(
+    masteryScore,
     reviewDate,
-    topic.attempts.length,
-    score,
     examDate,
+    reviewDate,
+    score
+  );
+
+  const estimatedMastery = estimateCurrentMastery(
+    topic.dateStudied,
+    topic.attempts,
     reviewDate
   );
 
@@ -166,9 +227,39 @@ export async function applyAttemptSchedule(
     data: {
       nextRevisionDate: schedule.nextRevisionDate,
       isActive: schedule.isActive,
-      currentMasteryScore: score,
+      currentMasteryScore: estimatedMastery,
     },
   });
 
-  return schedule;
+  return { schedule, masteryScore: estimatedMastery };
+}
+
+/** Load attempt history and compute display mastery for a topic. */
+export async function getTopicMasteryState(topicId: string, today = new Date()) {
+  const topic = await prisma.topic.findUnique({
+    where: { id: topicId },
+    select: {
+      dateStudied: true,
+      currentMasteryScore: true,
+      attempts: {
+        orderBy: { date: "asc" },
+        select: { date: true, score: true, type: true },
+      },
+    },
+  });
+
+  if (!topic) return null;
+
+  const estimated = estimateCurrentMastery(
+    topic.dateStudied,
+    topic.attempts,
+    today
+  );
+
+  return {
+    estimatedMastery: estimated,
+    storedMastery: topic.currentMasteryScore,
+    attempts: topic.attempts,
+    dateStudied: topic.dateStudied,
+  };
 }

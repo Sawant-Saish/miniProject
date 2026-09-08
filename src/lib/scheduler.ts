@@ -11,6 +11,7 @@ import {
   startOfDay,
 } from "date-fns";
 import { getEffectiveExamDate } from "@/lib/dates";
+import { initialMasteryScore } from "@/lib/mastery";
 
 /** Default score when no quiz/explanation attempt exists yet. */
 export const BASELINE_SCORE = 70;
@@ -137,19 +138,75 @@ export function calculateNextRevision(input: ScheduleInput): ScheduleResult {
   };
 }
 
+/**
+ * Compute interval days from BKT mastery estimate (Phase 6).
+ * Poor latest performance (< 60) still forces a 1-day reset.
+ */
+export function intervalDaysFromMastery(
+  masteryScore: number,
+  lastAttemptScore?: number
+): number {
+  if (lastAttemptScore !== undefined && lastAttemptScore < 60) {
+    return INTERVAL_LADDER_DAYS[0];
+  }
+
+  const p = Math.max(0, Math.min(100, masteryScore));
+
+  if (p < 35) return INTERVAL_LADDER_DAYS[0];
+  if (p < 50) return INTERVAL_LADDER_DAYS[1];
+  if (p < 65) return INTERVAL_LADDER_DAYS[2];
+  if (p < 78) return INTERVAL_LADDER_DAYS[3];
+  if (p < 90) return INTERVAL_LADDER_DAYS[4];
+  return INTERVAL_LADDER_DAYS[5];
+}
+
+/**
+ * Schedule the next revision from a mastery estimate (Phase 6).
+ * Replaces flat SM-2 repetition counting for post-attempt scheduling.
+ */
+export function scheduleFromMastery(
+  masteryScore: number,
+  lastReviewDate: Date,
+  examDate: Date | null,
+  fromDate: Date = new Date(),
+  lastAttemptScore?: number
+): ScheduleResult {
+  const today = toDay(fromDate);
+  const exam = examDate ? toDay(examDate) : null;
+  const anchor = toDay(lastReviewDate);
+
+  if (exam && today > exam) {
+    return { nextRevisionDate: null, intervalDays: 0, isActive: false };
+  }
+
+  let intervalDays = intervalDaysFromMastery(masteryScore, lastAttemptScore);
+  intervalDays = applyExamCompression(intervalDays, exam, today);
+
+  if (intervalDays <= 0) {
+    return { nextRevisionDate: null, intervalDays: 0, isActive: false };
+  }
+
+  let nextDate = addDays(anchor, intervalDays);
+
+  if (exam && nextDate > exam) {
+    nextDate = exam;
+  }
+
+  return {
+    nextRevisionDate: nextDate,
+    intervalDays,
+    isActive: true,
+  };
+}
+
 /** Schedule the first revision for a newly created topic. */
 export function scheduleInitialRevision(
   dateStudied: Date,
   examDate: Date | null,
-  fromDate: Date = new Date()
+  fromDate: Date = new Date(),
+  masteryScore: number = initialMasteryScore()
 ): ScheduleResult {
-  return calculateNextRevision({
-    anchorDate: dateStudied,
-    repetitionNumber: 0,
-    score: BASELINE_SCORE,
-    examDate,
-    fromDate,
-  });
+  return scheduleFromMastery(masteryScore, dateStudied, examDate, fromDate);
 }
 
 /**
