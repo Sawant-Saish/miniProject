@@ -6,14 +6,17 @@ export type {
 } from "@/lib/ai/provider";
 
 export type {
+  ExplanationFeedback,
   GeneratedQuestion,
   GenerateQuestionsInput,
+  GradeExplanationInput,
   QuestionDraft,
   QuestionType,
 } from "@/lib/ai/types";
 
 export {
   normalizeQuestionDraft,
+  parseExplanationFeedback,
   parseGeneratedQuestions,
   validateQuestionDraft,
 } from "@/lib/ai/validate";

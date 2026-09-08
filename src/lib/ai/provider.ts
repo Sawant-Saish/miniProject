@@ -1,6 +1,8 @@
 import type {
   GenerateQuestionsInput,
   GenerateQuestionsResult,
+  GradeExplanationInput,
+  GradeExplanationResult,
 } from "@/lib/ai/types";
 
 /**
@@ -11,4 +13,8 @@ export interface AIProvider {
   generateQuizQuestions(
     input: GenerateQuestionsInput
   ): Promise<GenerateQuestionsResult>;
+
+  gradeExplanation(
+    input: GradeExplanationInput
+  ): Promise<GradeExplanationResult>;
 }

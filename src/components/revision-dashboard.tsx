@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertCircle, Calendar, CalendarClock, CalendarDays, ClipboardCheck } from "lucide-react";
+import { AlertCircle, Calendar, CalendarClock, CalendarDays, ClipboardCheck, MessageSquareText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -76,8 +76,20 @@ function TopicBucketList({ groups }: { groups: DashboardGroup[] }) {
                     )}
                   >
                     <ClipboardCheck className="size-3" />
-                    Revise
+                    Quiz
                   </Link>
+                  {topic.hasNotes ? (
+                    <Link
+                      href={`/topics/${topic.id}/explain`}
+                      className={cn(
+                        buttonVariants({ size: "sm", variant: "outline" }),
+                        "h-7 gap-1 px-2 text-xs"
+                      )}
+                    >
+                      <MessageSquareText className="size-3" />
+                      Explain
+                    </Link>
+                  ) : null}
                 </div>
               </li>
             ))}

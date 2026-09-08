@@ -528,3 +528,87 @@ export async function saveGeneratedQuestions(
     return { ok: false as const, error: formatError(error) };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Feynman / explain-it-back (Phase 5)
+// ---------------------------------------------------------------------------
+
+const MIN_EXPLANATION_LENGTH = 40;
+
+export async function submitExplanation(topicId: string, explanation: string) {
+  if (!topicId) {
+    return { ok: false as const, error: "Topic id is required." };
+  }
+
+  const trimmed = explanation.trim();
+  if (trimmed.length < MIN_EXPLANATION_LENGTH) {
+    return {
+      ok: false as const,
+      error: `Write at least ${MIN_EXPLANATION_LENGTH} characters explaining the topic in your own words.`,
+    };
+  }
+
+  try {
+    const topic = await prisma.topic.findUnique({
+      where: { id: topicId },
+      include: { subject: { select: { examDate: true } } },
+    });
+
+    if (!topic) {
+      return { ok: false as const, error: "Topic not found." };
+    }
+    if (!topic.isActive) {
+      return { ok: false as const, error: "This topic is inactive." };
+    }
+
+    const notes = topic.notes?.trim();
+    if (!notes) {
+      return {
+        ok: false as const,
+        error: "This topic needs reference notes before explain-it-back grading.",
+      };
+    }
+
+    const { getAIProvider } = await import("@/lib/ai");
+    const { applyAttemptSchedule } = await import("@/lib/schedule-service");
+
+    const provider = getAIProvider();
+    const { feedback } = await provider.gradeExplanation({
+      topicName: topic.name,
+      notes,
+      explanation: trimmed,
+    });
+
+    const reviewDate = new Date();
+
+    await prisma.revisionAttempt.create({
+      data: {
+        topicId,
+        type: "explanation",
+        score: feedback.score,
+        date: reviewDate,
+        feedback: JSON.stringify({
+          comment: feedback.comment,
+          gaps: feedback.gaps,
+          explanation: trimmed,
+        }),
+      },
+    });
+
+    await applyAttemptSchedule(topicId, feedback.score, reviewDate);
+
+    revalidatePath("/");
+    revalidatePath("/topics");
+    revalidatePath(`/topics/${topicId}`);
+    revalidatePath(`/topics/${topicId}/explain`);
+
+    return {
+      ok: true as const,
+      score: feedback.score,
+      comment: feedback.comment,
+      gaps: feedback.gaps,
+    };
+  } catch (error) {
+    return { ok: false as const, error: formatError(error) };
+  }
+}

@@ -1,7 +1,10 @@
 import OpenAI from "openai";
 import type { AIProvider } from "@/lib/ai/provider";
-import type { GenerateQuestionsInput } from "@/lib/ai/types";
-import { parseGeneratedQuestions } from "@/lib/ai/validate";
+import type { GenerateQuestionsInput, GradeExplanationInput } from "@/lib/ai/types";
+import {
+  parseExplanationFeedback,
+  parseGeneratedQuestions,
+} from "@/lib/ai/validate";
 
 const SYSTEM_PROMPT = `You generate revision quiz questions for students.
 Return ONLY valid JSON matching this schema:
@@ -36,7 +39,36 @@ ${input.notes}
 Generate ${count} quiz questions (mix of mcq and short, mixed difficulty).`;
 }
 
-export function createOpenAIProvider(): AIProvider {
+const EXPLANATION_SYSTEM_PROMPT = `You grade a student's free-form explanation of a study topic (Feynman technique).
+Compare their explanation to the reference notes. Return ONLY valid JSON:
+{
+  "score": number,        // 0-100 comprehension score
+  "comment": "string",    // 1-2 sentence overall assessment
+  "gaps": ["string", ...] // 2-3 specific gaps, misconceptions, or missing points
+}
+Rules:
+- Score generously for correct ideas even if wording differs.
+- Penalize factual errors, missing core concepts, and vague hand-waving.
+- Each gap must be specific and actionable (not generic praise).
+- Provide exactly 2 or 3 gap items unless the explanation is near-perfect (then 1-2 minor gaps).`;
+
+function buildExplanationPrompt(input: GradeExplanationInput): string {
+  return `Topic: ${input.topicName}
+
+Reference notes (ground truth — student did NOT see these):
+"""
+${input.notes}
+"""
+
+Student's explanation (in their own words):
+"""
+${input.explanation}
+"""
+
+Grade how well the student explained the topic.`;
+}
+
+function createOpenAIClient() {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error(
@@ -44,34 +76,64 @@ export function createOpenAIProvider(): AIProvider {
     );
   }
 
-  const client = new OpenAI({ apiKey });
-  const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+  return {
+    client: new OpenAI({ apiKey }),
+    model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+  };
+}
+
+async function requestJson(
+  client: OpenAI,
+  model: string,
+  system: string,
+  user: string
+): Promise<unknown> {
+  const response = await client.chat.completions.create({
+    model,
+    temperature: 0.4,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error("OpenAI returned an empty response.");
+  }
+
+  try {
+    return JSON.parse(content);
+  } catch {
+    throw new Error("OpenAI returned invalid JSON.");
+  }
+}
+
+export function createOpenAIProvider(): AIProvider {
+  const { client, model } = createOpenAIClient();
 
   return {
     async generateQuizQuestions(input) {
-      const response = await client.chat.completions.create({
+      const parsed = await requestJson(
+        client,
         model,
-        temperature: 0.7,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: buildUserPrompt(input) },
-        ],
-      });
-
-      const content = response.choices[0]?.message?.content;
-      if (!content) {
-        throw new Error("OpenAI returned an empty response.");
-      }
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(content);
-      } catch {
-        throw new Error("OpenAI returned invalid JSON.");
-      }
+        SYSTEM_PROMPT,
+        buildUserPrompt(input)
+      );
 
       return { questions: parseGeneratedQuestions(parsed) };
+    },
+
+    async gradeExplanation(input) {
+      const parsed = await requestJson(
+        client,
+        model,
+        EXPLANATION_SYSTEM_PROMPT,
+        buildExplanationPrompt(input)
+      );
+
+      return { feedback: parseExplanationFeedback(parsed) };
     },
   };
 }

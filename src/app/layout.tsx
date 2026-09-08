@@ -31,7 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {children}
         </main>
         <footer className="border-t border-border py-4 text-center text-xs text-muted-foreground">
-          Adaptive Revision Planner — Phase 4 (AI question generation)
+          Adaptive Revision Planner — Phase 5 (Feynman explain-it-back)
         </footer>
       </body>
     </html>

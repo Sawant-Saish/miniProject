@@ -30,3 +30,21 @@ export type QuestionDraft = {
   options: string[];
   correctAnswer: string;
 };
+
+/** Input for Feynman / explain-it-back grading (Phase 5+). */
+export type GradeExplanationInput = {
+  topicName: string;
+  notes: string;
+  explanation: string;
+};
+
+/** Structured feedback from AI explanation grading. */
+export type ExplanationFeedback = {
+  score: number;
+  comment: string;
+  gaps: string[];
+};
+
+export type GradeExplanationResult = {
+  feedback: ExplanationFeedback;
+};

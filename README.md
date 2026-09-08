@@ -6,7 +6,7 @@ See **[phases_info.md](./phases_info.md)** for what each phase implements and ho
 
 ## Current phase
 
-**Phase 4** — OpenAI question generation via pluggable AI provider; review before save.
+**Phase 5** — Feynman explain-it-back mode with AI grading and scheduler integration.
 
 ## Quick start
 

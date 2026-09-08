@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ClipboardCheck } from "lucide-react";
+import { ClipboardCheck, MessageSquareText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -49,6 +49,7 @@ export default async function TopicDetailPage({ params }: PageProps) {
   );
   const due = topic.isActive && isRevisionDue(topic.nextRevisionDate);
   const canQuiz = topic.isActive && topic.questions.length > 0;
+  const canExplain = topic.isActive && Boolean(topic.notes?.trim());
 
   return (
     <div className="space-y-8">
@@ -84,6 +85,15 @@ export default async function TopicDetailPage({ params }: PageProps) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {canExplain ? (
+            <Link
+              href={`/topics/${topic.id}/explain`}
+              className={cn(buttonVariants({ size: "sm", variant: "outline" }), "gap-1.5")}
+            >
+              <MessageSquareText className="size-4" />
+              {due ? "Explain it back" : "Practice explanation"}
+            </Link>
+          ) : null}
           {canQuiz ? (
             <Link
               href={`/topics/${topic.id}/quiz`}
@@ -148,22 +158,43 @@ export default async function TopicDetailPage({ params }: PageProps) {
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              {topic.attempts.map((attempt) => (
-                <li
-                  key={attempt.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">
-                      {attempt.type === "quiz" ? "Quiz" : "Explanation"}
-                    </Badge>
-                    <span>{formatDisplayDate(attempt.date)}</span>
-                  </div>
-                  <span className="font-medium tabular-nums">
-                    {Math.round(attempt.score)}%
-                  </span>
-                </li>
-              ))}
+              {topic.attempts.map((attempt) => {
+                let feedbackPreview: string | null = null;
+                if (attempt.type === "explanation" && attempt.feedback) {
+                  try {
+                    const parsed = JSON.parse(attempt.feedback) as {
+                      comment?: string;
+                    };
+                    feedbackPreview = parsed.comment ?? null;
+                  } catch {
+                    feedbackPreview = null;
+                  }
+                }
+
+                return (
+                  <li
+                    key={attempt.id}
+                    className="rounded-md border border-border px-3 py-2 text-sm"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">
+                          {attempt.type === "quiz" ? "Quiz" : "Explanation"}
+                        </Badge>
+                        <span>{formatDisplayDate(attempt.date)}</span>
+                      </div>
+                      <span className="font-medium tabular-nums">
+                        {Math.round(attempt.score)}%
+                      </span>
+                    </div>
+                    {feedbackPreview ? (
+                      <p className="mt-2 text-muted-foreground">
+                        {feedbackPreview}
+                      </p>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           </CardContent>
         </Card>

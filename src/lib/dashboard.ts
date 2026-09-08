@@ -18,6 +18,7 @@ export type DashboardTopic = {
   subjectId: string;
   subjectName: string;
   isOverdue: boolean;
+  hasNotes: boolean;
 };
 
 export type DashboardGroup = {
@@ -112,6 +113,7 @@ export async function getRevisionDashboard(
       subjectId: topic.subject.id,
       subjectName: topic.subject.name,
       isOverdue: revisionDay < todayStart,
+      hasNotes: Boolean(topic.notes?.trim()),
     });
   }
 

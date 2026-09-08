@@ -379,7 +379,71 @@ Open a topic that has **notes**, then:
 
 ## Phase 5 — Feynman / explain-it-back mode
 
-**Status:** Not started  
+**Status:** Complete  
+**Date:** 2026-09-08
+
+### Goals
+
+- New revision mode: student writes a free-form explanation instead of a quiz
+- Send explanation + reference notes to OpenAI for structured grading
+- Display comprehension score, gaps, and comment; store as `RevisionAttempt`
+- Feed the score into the same scheduler as quiz attempts
+
+### What was built
+
+#### AI provider extension
+
+| Method | Purpose |
+| --- | --- |
+| `gradeExplanation(input)` | Returns `{ score, comment, gaps[] }` as strict JSON |
+
+Implemented in `openai-provider.ts`; validated via `parseExplanationFeedback()` in `validate.ts`.
+
+#### Server action
+
+- `submitExplanation(topicId, explanation)` — validates length (≥40 chars), calls AI, stores attempt with `type: "explanation"`, runs `applyAttemptSchedule`
+
+Feedback JSON stored on the attempt:
+
+```json
+{
+  "comment": "…",
+  "gaps": ["…", "…"],
+  "explanation": "student text…"
+}
+```
+
+#### UI
+
+| Route / component | Purpose |
+| --- | --- |
+| `/topics/[id]/explain` | Feynman revision session |
+| `ExplanationSession` | Textarea → AI grading → results with gaps |
+| Topic page | **Explain it back** / **Practice explanation** button (requires notes) |
+| Dashboard | **Explain** button next to **Quiz** when topic has notes |
+| Recent attempts | Shows AI comment preview for explanation attempts |
+
+Notes are **not** shown during the explanation (student explains from memory); AI compares against notes server-side only.
+
+### How to run / test Phase 5
+
+```bash
+npm install
+# OPENAI_API_KEY required in .env
+npm run dev
+```
+
+1. Ensure a topic has **notes** and is **active**  
+2. Open **Explain it back** from the topic page or dashboard  
+3. Write a paragraph explaining the topic (≥40 characters)  
+4. Submit — review score, overall comment, and 2–3 gaps  
+5. Confirm **Recent attempts** and **Next revision** updated on the topic page  
+6. Compare a strong vs weak explanation — schedule should extend vs compress  
+
+### Explicitly NOT in Phase 5
+
+- Bayesian mastery model (Phase 6)  
+- Mastery trend charts (Phase 7)  
 
 ---
 

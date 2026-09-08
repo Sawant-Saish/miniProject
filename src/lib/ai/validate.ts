@@ -1,4 +1,8 @@
-import type { GeneratedQuestion, QuestionDraft } from "@/lib/ai/types";
+import type {
+  ExplanationFeedback,
+  GeneratedQuestion,
+  QuestionDraft,
+} from "@/lib/ai/types";
 
 function isQuestionType(value: unknown): value is "mcq" | "short" {
   return value === "mcq" || value === "short";
@@ -125,5 +129,39 @@ export function normalizeQuestionDraft(draft: QuestionDraft): {
     prompt: draft.prompt.trim(),
     options: null,
     correctAnswer: draft.correctAnswer.trim(),
+  };
+}
+
+/** Parse and validate AI explanation grading JSON (Phase 5). */
+export function parseExplanationFeedback(raw: unknown): ExplanationFeedback {
+  if (!raw || typeof raw !== "object") {
+    throw new Error("AI response is not a JSON object.");
+  }
+
+  const record = raw as Record<string, unknown>;
+  const scoreRaw = Number(record.score);
+  const comment = String(record.comment ?? "").trim();
+  const gapsRaw = record.gaps;
+
+  if (Number.isNaN(scoreRaw) || scoreRaw < 0 || scoreRaw > 100) {
+    throw new Error("AI returned an invalid comprehension score.");
+  }
+
+  if (!comment) {
+    throw new Error("AI response missing an overall comment.");
+  }
+
+  const gaps = Array.isArray(gapsRaw)
+    ? gapsRaw.map(String).map((g) => g.trim()).filter(Boolean)
+    : [];
+
+  if (gaps.length === 0) {
+    throw new Error("AI response missing specific gaps or misconceptions.");
+  }
+
+  return {
+    score: Math.round(scoreRaw),
+    comment,
+    gaps: gaps.slice(0, 5),
   };
 }
